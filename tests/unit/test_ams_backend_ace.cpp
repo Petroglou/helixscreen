@@ -3520,3 +3520,29 @@ TEST_CASE("ACE REST slots bridge carries park_state", "[ams][ace][segment][park]
     CHECK(helper.get_slot_filament_segment(3) == PathSegment::SPOOL);
     CHECK(helper.get_slot_filament_segment(0) == PathSegment::SPOOL);
 }
+
+// The fork reports a slot's motion state as its status (feeding, unwinding,
+// shifting - which an ACE 2 slot under feed assist reports throughout - and
+// identifying while the tag is read). The spool is in the slot in all of them.
+TEST_CASE("ACE slot in motion keeps its spool", "[ams][ace][slot-status]") {
+    for (const char* word : {"feeding", "unwinding", "shifting", "identifying"}) {
+        DYNAMIC_SECTION("status " << word) {
+            AmsBackendAceTestHelper helper;
+            json unit = make_kobra_instance_object();
+            unit["slots"][0]["status"] = word;
+            AceTestAccess::parse_ace(helper, unit);
+
+            CHECK(helper.get_slot_info(0).status == SlotStatus::AVAILABLE);
+            CHECK(helper.get_slot_info(0).material == "PLA");
+        }
+    }
+
+    SECTION("empty stays empty") {
+        AmsBackendAceTestHelper helper;
+        json unit = make_kobra_instance_object();
+        unit["slots"][0]["status"] = "empty";
+        AceTestAccess::parse_ace(helper, unit);
+
+        CHECK(helper.get_slot_info(0).status == SlotStatus::EMPTY);
+    }
+}
