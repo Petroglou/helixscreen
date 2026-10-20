@@ -909,6 +909,7 @@ translations:
     verfügbar.
   Could not answer the connection request: 'Verbindungsanfrage konnte nicht beantwortet werden'
   'Could not check {} - it stays in the queue': '{} konnte nicht geprüft werden – bleibt in der Warteschlange'
+  Load a tool before feeding or retracting: ''
   Load all stopped: Laden gestoppt
   Load stopped: Laden gestoppt
   No filament was inserted in time. The heater is off and the carriage is restored: 'Kein Filament wurde rechtzeitig eingeführt. Die Heizung ist aus und der Schlitten ist zurückgestellt'

@@ -911,6 +911,7 @@ translations:
     d'analyser la macro PRINT_START. Certaines options d'impression peuvent être indisponibles.
   Could not answer the connection request: 'Impossible de répondre à la demande de connexion'
   'Could not check {} - it stays in the queue': 'Impossible de vérifier {} – reste dans la file'
+  Load a tool before feeding or retracting: ''
   Load all stopped: 'Chargement global arrêté'
   Load stopped: 'Chargement arrêté'
   No filament was inserted in time. The heater is off and the carriage is restored: 'Aucun filament n''a été inséré à temps. La chauffe est coupée et le chariot est rétabli'

@@ -1856,6 +1856,7 @@
   <translation tag="Load Profile" en="Load Profile"/>
   <translation tag="Load a filament first before trying to unload" en="Load a filament first before trying to unload"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" en="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one"/>
+  <translation tag="Load a tool before feeding or retracting" en="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" en="Load all stopped"/>
   <translation tag="Load and unload filament at the tool by hand" en="Load and unload filament at the tool by hand"/>
   <translation tag="Load canceled: nozzle target dropped" en="Load canceled: nozzle target dropped"/>

@@ -839,6 +839,7 @@ translations:
     マクロを分析できませんでした。一部の印刷オプションが利用できない場合があります。
   Could not answer the connection request: '接続リクエストに応答できませんでした'
   'Could not check {} - it stays in the queue': '{} を確認できませんでした – キューに残ります'
+  Load a tool before feeding or retracting: ''
   Load all stopped: 'すべてのロードを停止しました'
   Load stopped: 'ロードを停止しました'
   No filament was inserted in time. The heater is off and the carriage is restored: '時間内にフィラメントが挿入されませんでした。ヒーターを切り、キャリッジを元に戻しました'

@@ -1856,6 +1856,7 @@
   <translation tag="Load Profile" es="Cargar perfil"/>
   <translation tag="Load a filament first before trying to unload" es="Cargue primero filamento antes de intentar descargar"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" es="Cargue una bobina nueva en esta ranura, o active el rellenado automático para cambiar a una equivalente"/>
+  <translation tag="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" es="Carga de todo detenida"/>
   <translation tag="Load and unload filament at the tool by hand" es="Carga y descarga el filamento a mano en la herramienta"/>
   <translation tag="Load canceled: nozzle target dropped" es="Carga cancelada: el objetivo de la boquilla bajó"/>

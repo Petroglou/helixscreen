@@ -950,6 +950,7 @@ translations:
     быть недоступны.
   Could not answer the connection request: 'Не удалось ответить на запрос подключения'
   'Could not check {} - it stays in the queue': 'Не удалось проверить {} – остаётся в очереди'
+  Load a tool before feeding or retracting: ''
   Load all stopped: 'Загрузка всех остановлена'
   Load stopped: 'Загрузка остановлена'
   No filament was inserted in time. The heater is off and the carriage is restored: 'Филамент не был вставлен вовремя. Нагреватель выключен, каретка возвращена'

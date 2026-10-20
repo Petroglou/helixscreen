@@ -1901,6 +1901,7 @@
   <translation tag="Load Profile" ru="Загрузить профиль"/>
   <translation tag="Load a filament first before trying to unload" ru="Сначала загрузите филамент, прежде чем пытаться его выгрузить"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" ru="Установите новую катушку в этот слот или включите автопополнение для переключения на подходящую"/>
+  <translation tag="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" ru="Загрузка всех остановлена"/>
   <translation tag="Load and unload filament at the tool by hand" ru="Загружайте и выгружайте филамент вручную на инструменте"/>
   <translation tag="Load canceled: nozzle target dropped" ru="Загрузка отменена: цель сопла снижена"/>

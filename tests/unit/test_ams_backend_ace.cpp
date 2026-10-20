@@ -29,12 +29,14 @@
 #include "test_helpers/seeded_override.h"
 
 #include <algorithm>
+#include <any>
 #include <filesystem>
 #include <json.hpp> // nlohmann/json from libhv
 #include <memory>
 #include <optional>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 #include "../catch_amalgamated.hpp"
 
@@ -3519,4 +3521,79 @@ TEST_CASE("ACE REST slots bridge carries park_state", "[ams][ace][segment][park]
     CHECK(helper.get_slot_filament_segment(2) == PathSegment::OUTPUT);
     CHECK(helper.get_slot_filament_segment(3) == PathSegment::SPOOL);
     CHECK(helper.get_slot_filament_segment(0) == PathSegment::SPOOL);
+}
+
+// ============================================================================
+// prestonbrown/helixscreen#1821: the Kobra S1 fork's ACE_FEED, ACE_RETRACT and
+// the feed assist commands take T=<tool> or INSTANCE= INDEX=, and refuse a
+// bare INDEX=. The loaded tool is global across the fork's units; with T5
+// seated no slot of the displayed unit is current, and the old fallback to
+// slot 0 would have fed T0 into a path that already holds T5.
+// ============================================================================
+
+namespace {
+json make_kobra_second_unit_object() {
+    json unit1 = make_kobra_instance_object();
+    unit1["instance"] = 1;
+    unit1["protocol"] = "ace2_proto";
+    for (int i = 0; i < 4; ++i) {
+        unit1["slots"][i]["tool"] = 4 + i;
+    }
+    return unit1;
+}
+
+// The bootstrap query of a two-unit rig: the manager and both instances.
+void start_two_unit_backend(AmsBackendAceTestHelper& helper,
+                            helix::test::FakeMoonrakerClient& client, int current_index) {
+    helper.test_on_started();
+    REQUIRE_FALSE(client.rpc_calls.empty());
+    REQUIRE(client.rpc_calls.back().success_cb);
+    json response = make_kobra_objects_query_response(current_index);
+    response["result"]["status"]["ace"]["ace_instances"] = 2;
+    response["result"]["status"]["ace_instance_1"] = make_kobra_second_unit_object();
+    client.rpc_calls.back().success_cb(response);
+    helix::ui::UpdateQueue::instance().drain();
+}
+} // namespace
+
+TEST_CASE_METHOD(LVGLTestFixture, "ACE manual feed names the loaded tool on the fork",
+                 "[ams][ace][1821]") {
+    helix::test::FakeMoonrakerClient client;
+    AmsBackendAceTestHelper helper(&client);
+    start_two_unit_backend(helper, client, 5);
+    REQUIRE(helper.get_test_system_info().current_tool == 5);
+
+    REQUIRE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    REQUIRE(helper.execute_device_action("ace_manual_retract", std::any{}).success());
+    REQUIRE(helper.execute_device_action("ace_feed_assist_toggle", true).success());
+    REQUIRE(helper.execute_device_action("ace_feed_assist_toggle", false).success());
+
+    CHECK(helper.captured_gcodes == std::vector<std::string>{
+                                        "ACE_FEED T=5 LENGTH=50 SPEED=50",
+                                        "ACE_RETRACT T=5 LENGTH=50 SPEED=50",
+                                        "ACE_ENABLE_FEED_ASSIST T=5",
+                                        "ACE_DISABLE_FEED_ASSIST T=5",
+                                    });
+}
+
+TEST_CASE_METHOD(LVGLTestFixture, "ACE manual feed refuses with no tool loaded on the fork",
+                 "[ams][ace][1821]") {
+    helix::test::FakeMoonrakerClient client;
+    AmsBackendAceTestHelper helper(&client);
+    start_two_unit_backend(helper, client, -1);
+
+    CHECK_FALSE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    CHECK_FALSE(helper.execute_device_action("ace_manual_retract", std::any{}).success());
+    CHECK_FALSE(helper.execute_device_action("ace_feed_assist_toggle", true).success());
+    CHECK(helper.captured_gcodes.empty());
+}
+
+TEST_CASE("ACE manual feed keeps INDEX= for a ValgACE hub", "[ams][ace][1821]") {
+    AmsBackendAceTestHelper helper;
+    helper.set_running(true);
+    AceTestAccess::parse_ace(helper, make_ace_slot_payload("ready", 0xFF5500, "PLA"));
+
+    REQUIRE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    REQUIRE(helper.captured_gcodes.size() == 1);
+    CHECK(helper.captured_gcodes[0] == "ACE_FEED INDEX=0 LENGTH=50 SPEED=50");
 }

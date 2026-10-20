@@ -396,6 +396,13 @@ class AmsBackendAce : public AmsSubscriptionBackend {
      */
     static const nlohmann::json* manager_ace_object(const nlohmann::json& status);
 
+    /// The slot argument of a manual ACE command (feed, retract, feed assist):
+    /// `T=<tool>` on the Kobra S1 fork, whose commands refuse a bare INDEX=
+    /// (#1821) and whose tool numbers span all its units, else `INDEX=<slot>`.
+    /// Empty when the fork has no tool loaded: there is nothing to name, and a
+    /// default slot could feed a second strand into an occupied path.
+    [[nodiscard]] std::optional<std::string> manual_slot_argument() const;
+
     /// Fold the manager's path sensors (`rdm_sensor` at the hub,
     /// `toolhead_sensor` at the extruder) into the cached readings and onto the
     /// unit. A frame stating neither leaves the last reading standing: notify
@@ -441,6 +448,10 @@ class AmsBackendAce : public AmsSubscriptionBackend {
 
     // Dryer state (ACE-specific, not in base class)
     DryerInfo dryer_info_;
+
+    // Set once the bootstrap committed to the Kobra S1 fork's per-unit
+    // `ace_instance_N` objects, whose commands name a tool. Guarded by mutex_.
+    bool instance_objects_ = false;
 
     // Info tracking
     std::atomic<bool> info_fetched_{false};

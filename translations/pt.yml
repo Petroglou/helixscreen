@@ -906,6 +906,7 @@ translations:
     indisponíveis.
   Could not answer the connection request: 'Não foi possível responder à solicitação de conexão'
   'Could not check {} - it stays in the queue': 'Não foi possível verificar {} – permanece na fila'
+  Load a tool before feeding or retracting: ''
   Load all stopped: Carregamento de todos interrompido
   Load stopped: Carregamento interrompido
   No filament was inserted in time. The heater is off and the carriage is restored: 'Nenhum filamento foi inserido a tempo. O aquecedor está desligado e o carrinho foi restaurado'

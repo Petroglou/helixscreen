@@ -837,6 +837,7 @@ translations:
     PRINT_START 宏。部分打印选项可能不可用。
   Could not answer the connection request: '无法响应连接请求'
   'Could not check {} - it stays in the queue': '无法检查 {} – 保留在队列中'
+  Load a tool before feeding or retracting: ''
   Load all stopped: '全部装载已停止'
   Load stopped: '装载已停止'
   No filament was inserted in time. The heater is off and the carriage is restored: '未及时插入耗材。加热已关闭，滑架已复位'

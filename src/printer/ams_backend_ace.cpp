@@ -182,6 +182,10 @@ void AmsBackendAce::on_started() {
                     spdlog::info("[ACE] Klipper '{}' object has status data — "
                                  "using native WebSocket subscription",
                                  matched_key);
+                    if (matched_key.rfind("ace_instance", 0) == 0) {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        instance_objects_ = true;
+                    }
 
                     parse_ace_object(*ace_data);
                     // A manager-shaped `ace` can ride the same response and
@@ -1928,43 +1932,62 @@ std::vector<helix::printer::DeviceAction> AmsBackendAce::get_device_actions() co
     return actions;
 }
 
+std::optional<std::string> AmsBackendAce::manual_slot_argument() const {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (instance_objects_) {
+            if (system_info_.current_tool < 0) {
+                return std::nullopt;
+            }
+            return "T=" + std::to_string(system_info_.current_tool);
+        }
+    }
+    int slot = get_current_slot();
+    if (slot < 0)
+        slot = 0;
+    return "INDEX=" + std::to_string(slot);
+}
+
 AmsError AmsBackendAce::do_execute_device_action(const std::string& action_id,
                                                  const std::any& value) {
+    const bool manual_slot_action = action_id == "ace_manual_feed" ||
+                                    action_id == "ace_manual_retract" ||
+                                    action_id == "ace_feed_assist_toggle";
+    std::string slot_arg;
+    if (manual_slot_action) {
+        const auto arg = manual_slot_argument();
+        if (!arg) {
+            return AmsError(AmsResult::WRONG_STATE, "No tool loaded",
+                            lv_tr("Load a tool before feeding or retracting"), "");
+        }
+        slot_arg = *arg;
+    }
+
     if (action_id == "ace_manual_feed") {
-        int slot = get_current_slot();
-        if (slot < 0)
-            slot = 0;
         static constexpr int kManualFeedLength = 50;
         static constexpr int kManualFeedSpeed = 50;
-        return execute_gcode("ACE_FEED INDEX=" + std::to_string(slot) +
+        return execute_gcode("ACE_FEED " + slot_arg +
                              " LENGTH=" + std::to_string(kManualFeedLength) +
                              " SPEED=" + std::to_string(kManualFeedSpeed));
     }
 
     if (action_id == "ace_manual_retract") {
-        int slot = get_current_slot();
-        if (slot < 0)
-            slot = 0;
         static constexpr int kManualRetractLength = 50;
         static constexpr int kManualRetractSpeed = 50;
-        return execute_gcode("ACE_RETRACT INDEX=" + std::to_string(slot) +
+        return execute_gcode("ACE_RETRACT " + slot_arg +
                              " LENGTH=" + std::to_string(kManualRetractLength) +
                              " SPEED=" + std::to_string(kManualRetractSpeed));
     }
 
     if (action_id == "ace_feed_assist_toggle") {
-        int slot = get_current_slot();
-        if (slot < 0)
-            slot = 0;
-
         const auto [enable, err] = printer::device_action_value<bool>(value, "feed assist state");
         if (!err) {
             return err;
         }
         if (enable) {
-            return execute_gcode("ACE_ENABLE_FEED_ASSIST INDEX=" + std::to_string(slot));
+            return execute_gcode("ACE_ENABLE_FEED_ASSIST " + slot_arg);
         } else {
-            return execute_gcode("ACE_DISABLE_FEED_ASSIST INDEX=" + std::to_string(slot));
+            return execute_gcode("ACE_DISABLE_FEED_ASSIST " + slot_arg);
         }
     }
 
