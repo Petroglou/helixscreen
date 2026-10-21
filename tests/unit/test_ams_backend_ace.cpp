@@ -23,18 +23,21 @@
 #include "printer_discovery.h"
 #include "printer_state.h"
 #include "settings_manager.h"
+#include "test_helpers/ace_backend_test_helper.h"
 #include "test_helpers/ace_test_access.h"
 #include "test_helpers/backend_user_edit.h"
 #include "test_helpers/registered_backend.h"
 #include "test_helpers/seeded_override.h"
 
 #include <algorithm>
+#include <any>
 #include <filesystem>
 #include <json.hpp> // nlohmann/json from libhv
 #include <memory>
 #include <optional>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 #include "../catch_amalgamated.hpp"
 
@@ -51,6 +54,7 @@ using helix::SlotInfo;
 using helix::SlotStatus;
 
 using json = nlohmann::json;
+using namespace ace_fixtures;
 
 namespace {
 // Per-test tmp cache dir — same idiom as IFS/Snapmaker tests.
@@ -93,92 +97,6 @@ json make_ace_slot_payload(const std::string& status_str, uint32_t color_rgb,
 // FLAT, single-hub schema Rinkhals firmware exposes): 4 slots, one "ready"
 // PLA slot with an RGB color, the rest "empty"; a live "dryer" object in the
 // "drying" state; and current_filament "0-1" (local slot 1 loaded).
-// --- #1069 live-capture builders (Kobra S1 mainline-Python fork / "ACEPRO"
-// driver, 1x ACE Pro, fw V1.3.856). Field-for-field the user's captures: the
-// `ace` object is a MANAGER (no slots) whose `current_index` is the ONLY
-// loaded-tool signal (-1 = nothing loaded); `ace_instance_0` carries the four
-// slots with `material` (no `type`) and the dryer nested under `dryer_status`.
-
-json make_kobra_manager_object(int current_index) {
-    return json{
-        {"ace_instances", 1},
-        {"current_index", current_index},
-        {"target_index", -1},
-        {"endless_spool_enabled", false},
-        {"endless_spool_match_mode", "exact"},
-        {"ace_pro_enabled", true},
-        {"toolhead_sensor", true},
-        {"rdm_sensor", true},
-    };
-}
-
-json make_kobra_slots_array() {
-    return json::array({
-        json{{"index", 0},
-             {"tool", 0},
-             {"status", "ready"},
-             {"color", json::array({0, 230, 118})},
-             {"material", "PLA"},
-             {"temp", 225},
-             {"rfid", false}},
-        json{{"index", 1},
-             {"tool", 1},
-             {"status", "ready"},
-             {"color", json::array({255, 255, 255})},
-             {"material", "PETG"},
-             {"temp", 245},
-             {"rfid", false}},
-        json{{"index", 2},
-             {"tool", 2},
-             {"status", "ready"},
-             {"color", json::array({229, 57, 53})},
-             {"material", "PETG"},
-             {"temp", 255},
-             {"rfid", false}},
-        json{{"index", 3},
-             {"tool", 3},
-             {"status", "ready"},
-             {"color", json::array({255, 255, 255})},
-             {"material", "PLA"},
-             {"temp", 225},
-             {"rfid", false}},
-    });
-}
-
-json make_kobra_instance_object() {
-    return json{
-        {"status", "ready"},
-        {"dryer_status",
-         json{{"status", "stop"}, {"target_temp", 0}, {"duration", 0}, {"remain_time", 0}}},
-        {"temp", 34},
-        {"enable_rfid", 1},
-        {"fan_speed", 7000},
-        {"feed_assist_count", 0},
-        {"cont_assist_time", 0.0},
-        {"slots", make_kobra_slots_array()},
-        {"instance", 0},
-        {"protocol", "ace1_json"},
-        {"rfid_sync_enabled", true},
-        {"feed_assist_slot", -1},
-        {"model", "Anycubic Color Engine Pro"},
-        {"firmware", "V1.3.856"},
-        {"boot_firmware", "V1.0.1"},
-        {"structure_version", "3"},
-        {"usb_port", "/dev/ttyACM2"},
-        {"usb_path", "1-1.3.4.3"},
-        {"connection_state", "connected"},
-    };
-}
-
-// printer.objects.query answer carrying both the manager and the slot-bearing
-// instance, as the fork's initial query does.
-json make_kobra_objects_query_response(int current_index) {
-    json status = json::object();
-    status["ace"] = make_kobra_manager_object(current_index);
-    status["ace_instance_0"] = make_kobra_instance_object();
-    return json{{"result", {{"eventtime", 33117.349534149}, {"status", status}}}};
-}
-
 // GET /server/ace/status result: instance 0's get_status() verbatim plus the
 // fork's envelope keys (instance_index, instances[], ace_manager,
 // ace_instance_count).
@@ -233,103 +151,6 @@ json make_native_filament_hub_payload() {
 }
 
 } // namespace
-
-/**
- * @brief Test helper class providing access to AmsBackendAce internals
- *
- * This class provides controlled access to private members for unit testing.
- * It does NOT start the backend (no Moonraker connection needed).
- */
-class AmsBackendAceTestHelper : public AmsBackendAce {
-  public:
-    using AmsSubscriptionBackend::send_endless_spool_switch;
-    AmsBackendAceTestHelper() : AmsBackendAce(nullptr, nullptr) {}
-    explicit AmsBackendAceTestHelper(helix::IMoonrakerClient* client)
-        : AmsBackendAce(nullptr, client) {}
-
-    // Parse response helpers - call the protected parsing methods
-    void test_parse_info_response(const json& data) {
-        parse_info_response(data);
-    }
-
-    bool test_parse_status_response(const json& data) {
-        return parse_status_response(data);
-    }
-
-    bool test_parse_slots_response(const json& data) {
-        return parse_slots_response(data);
-    }
-
-    // Drive the WebSocket status-update path (protected hook) so tests can
-    // exercise the filament_hub/ace key-picking logic, not just parse_ace_object.
-    void test_handle_status_update(const json& notification) {
-        handle_status_update(notification);
-    }
-
-    // Drive the subscription bootstrap (initial printer.objects.query). The
-    // parse lands on the UpdateQueue — drain after calling.
-    void test_on_started() {
-        on_started();
-    }
-
-    // State accessors for verification
-    AmsSystemInfo get_test_system_info() const {
-        return get_system_info();
-    }
-
-    DryerInfo get_test_dryer_info() const {
-        return get_dryer_info();
-    }
-
-    // Filament ops refuse unless the backend is started; these tests drive the
-    // op hooks without a Moonraker connection.
-    void set_running(bool state) {
-        running_ = state;
-    }
-
-    // parse_slots_response resizes units[0].slots without touching slot_count
-    // when the size is unchanged, so the two can disagree.
-    void set_stale_slot_count(int count) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        system_info_.units[0].slot_count = count;
-    }
-
-    void set_test_action(AmsAction action) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        system_info_.action = action;
-    }
-
-    // Load and unload resolve through this seam, so a test can assert what was
-    // sent and fire the driver's ack when it chooses. A driver that ignores a
-    // toolchange still acks it, which is the case worth reproducing.
-    std::vector<std::string> captured_gcodes;
-    std::function<void()> pending_ack;
-
-    // Fire-and-forget sends (bypass) take this form; the completion form below
-    // is for ops whose ack matters. Both capture, so a test reads one list.
-    helix::AmsError execute_gcode(const std::string& gcode) override {
-        captured_gcodes.push_back(gcode);
-        return helix::AmsErrorHelper::success();
-    }
-
-    helix::AmsError execute_gcode(const std::string& gcode, std::function<void()> on_complete,
-                                  std::function<void(const MoonrakerError&)> on_error,
-                                  bool silent) override {
-        if (dispatch_via_base) {
-            return AmsSubscriptionBackend::execute_gcode(gcode, std::move(on_complete),
-                                                         std::move(on_error), silent);
-        }
-        captured_gcodes.push_back(gcode);
-        pending_ack = std::move(on_complete);
-        return helix::AmsErrorHelper::success();
-    }
-
-  public:
-    // Routes the completion-form dispatch to the REAL AmsSubscriptionBackend
-    // implementation (api_ is null here) instead of the capture seam, so a
-    // test can exercise the dispatch's own refusal legs.
-    bool dispatch_via_base = false;
-};
 
 // ============================================================================
 // Type and Topology Tests
@@ -3519,4 +3340,98 @@ TEST_CASE("ACE REST slots bridge carries park_state", "[ams][ace][segment][park]
     CHECK(helper.get_slot_filament_segment(2) == PathSegment::OUTPUT);
     CHECK(helper.get_slot_filament_segment(3) == PathSegment::SPOOL);
     CHECK(helper.get_slot_filament_segment(0) == PathSegment::SPOOL);
+}
+
+// ============================================================================
+// prestonbrown/helixscreen#1821: the Kobra S1 fork's ACE_FEED, ACE_RETRACT and
+// the feed assist commands take T=<tool> or INSTANCE= INDEX=, and refuse a
+// bare INDEX=. The loaded tool is global across the fork's units; with T5
+// seated no slot of the displayed unit is current, and the old fallback to
+// slot 0 would have fed T0 into a path that already holds T5.
+// ============================================================================
+
+TEST_CASE_METHOD(LVGLTestFixture, "ACE manual feed names the loaded tool on the fork",
+                 "[ams][ace][1821]") {
+    helix::test::FakeMoonrakerClient client;
+    AmsBackendAceTestHelper helper(&client);
+    start_two_unit_backend(helper, client, 5);
+    REQUIRE(helper.get_test_system_info().current_tool == 5);
+
+    REQUIRE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    REQUIRE(helper.execute_device_action("ace_manual_retract", std::any{}).success());
+    REQUIRE(helper.execute_device_action("ace_feed_assist_toggle", true).success());
+    REQUIRE(helper.execute_device_action("ace_feed_assist_toggle", false).success());
+
+    CHECK(helper.captured_gcodes == std::vector<std::string>{
+                                        "ACE_FEED T=5 LENGTH=50 SPEED=50",
+                                        "ACE_RETRACT T=5 LENGTH=50 SPEED=50",
+                                        "ACE_ENABLE_FEED_ASSIST T=5",
+                                        "ACE_DISABLE_FEED_ASSIST T=5",
+                                    });
+}
+
+TEST_CASE_METHOD(LVGLTestFixture, "ACE manual feed refuses with no tool loaded on the fork",
+                 "[ams][ace][1821]") {
+    helix::test::FakeMoonrakerClient client;
+    AmsBackendAceTestHelper helper(&client);
+    start_two_unit_backend(helper, client, -1);
+
+    CHECK_FALSE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    CHECK_FALSE(helper.execute_device_action("ace_manual_retract", std::any{}).success());
+    CHECK_FALSE(helper.execute_device_action("ace_feed_assist_toggle", true).success());
+    CHECK(helper.captured_gcodes.empty());
+}
+
+// Only the Kobra S1 fork's per-unit objects state a link; another driver's
+// object carrying the same field leaves its unit connected.
+TEST_CASE("ACE reads connection_state from the fork only", "[ams][ace]") {
+    AmsBackendAceTestHelper helper;
+    json payload = make_ace_slot_payload("ready", 0xFF5500, "PLA");
+    payload["connection_state"] = "reconnecting";
+    AceTestAccess::parse_ace(helper, payload);
+    REQUIRE_FALSE(helper.get_test_system_info().units.empty());
+    CHECK(helper.get_test_system_info().units[0].connected);
+}
+
+// ValgACE names no tool per slot: its slots map none, and a Load stays a load.
+TEST_CASE("ACE slots without a driver tool number map no tool", "[ams][ace]") {
+    AmsBackendAceTestHelper helper;
+    AceTestAccess::parse_ace(helper, make_ace_slot_payload("ready", 0xFF5500, "PLA"));
+    CHECK(helper.get_slot_info(0).mapped_tool == -1);
+}
+
+TEST_CASE("ACE manual feed keeps INDEX= for a ValgACE hub", "[ams][ace][1821]") {
+    AmsBackendAceTestHelper helper;
+    helper.set_running(true);
+    AceTestAccess::parse_ace(helper, make_ace_slot_payload("ready", 0xFF5500, "PLA"));
+
+    REQUIRE(helper.execute_device_action("ace_manual_feed", std::any{}).success());
+    REQUIRE(helper.captured_gcodes.size() == 1);
+    CHECK(helper.captured_gcodes[0] == "ACE_FEED INDEX=0 LENGTH=50 SPEED=50");
+}
+
+// The fork reports a slot's motion state as its status (feeding, unwinding,
+// shifting - which an ACE 2 slot under feed assist reports throughout - and
+// identifying while the tag is read). The spool is in the slot in all of them.
+TEST_CASE("ACE slot in motion keeps its spool", "[ams][ace][slot-status]") {
+    for (const char* word : {"feeding", "unwinding", "shifting", "identifying"}) {
+        DYNAMIC_SECTION("status " << word) {
+            AmsBackendAceTestHelper helper;
+            json unit = make_kobra_instance_object();
+            unit["slots"][0]["status"] = word;
+            AceTestAccess::parse_ace(helper, unit);
+
+            CHECK(helper.get_slot_info(0).status == SlotStatus::AVAILABLE);
+            CHECK(helper.get_slot_info(0).material == "PLA");
+        }
+    }
+
+    SECTION("empty stays empty") {
+        AmsBackendAceTestHelper helper;
+        json unit = make_kobra_instance_object();
+        unit["slots"][0]["status"] = "empty";
+        AceTestAccess::parse_ace(helper, unit);
+
+        CHECK(helper.get_slot_info(0).status == SlotStatus::EMPTY);
+    }
 }

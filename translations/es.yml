@@ -906,6 +906,7 @@ translations:
     estar disponibles.
   Could not answer the connection request: 'No se pudo responder a la solicitud de conexión'
   'Could not check {} - it stays in the queue': 'No se pudo comprobar {}: permanece en la cola'
+  Load a tool before feeding or retracting: ''
   Load all stopped: Carga de todo detenida
   Load stopped: Carga detenida
   No filament was inserted in time. The heater is off and the carriage is restored: 'No se introdujo filamento a tiempo. El calentador está apagado y el carro está restaurado'

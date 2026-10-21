@@ -1856,6 +1856,7 @@
   <translation tag="Load Profile" zh="加载配置"/>
   <translation tag="Load a filament first before trying to unload" zh="请先装载耗材，再尝试卸载"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" zh="请在此槽位装入新料盘，或开启自动续料以切换到匹配的料盘"/>
+  <translation tag="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" zh="全部装载已停止"/>
   <translation tag="Load and unload filament at the tool by hand" zh="请在工具上手动装入和卸载耗材"/>
   <translation tag="Load canceled: nozzle target dropped" zh="加载已取消：喷嘴目标温度已降低"/>

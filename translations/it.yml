@@ -901,6 +901,7 @@ translations:
     disponibili.
   Could not answer the connection request: 'Impossibile rispondere alla richiesta di connessione'
   'Could not check {} - it stays in the queue': 'Impossibile verificare {} – resta in coda'
+  Load a tool before feeding or retracting: ''
   Load all stopped: Caricamento di tutti interrotto
   Load stopped: Caricamento interrotto
   No filament was inserted in time. The heater is off and the carriage is restored: 'Nessun filamento inserito in tempo. Il riscaldatore è spento e il carrello è ripristinato'

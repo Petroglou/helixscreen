@@ -879,6 +879,7 @@ translations:
     not analyze PRINT_START macro. Some print options may be unavailable.
   Could not answer the connection request: Could not answer the connection request
   'Could not check {} - it stays in the queue': 'Could not check {} - it stays in the queue'
+  Load a tool before feeding or retracting: Load a tool before feeding or retracting
   Load all stopped: Load all stopped
   Load stopped: Load stopped
   No filament was inserted in time. The heater is off and the carriage is restored: No filament was inserted in time. The heater is off and the carriage is restored

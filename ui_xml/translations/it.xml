@@ -1856,6 +1856,7 @@
   <translation tag="Load Profile" it="Carica profilo"/>
   <translation tag="Load a filament first before trying to unload" it="Prima carica il filamento, poi prova a scaricarlo"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" it="Caricare una nuova bobina in questo slot, oppure attivare il rifornimento automatico per passare a una compatibile"/>
+  <translation tag="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" it="Caricamento di tutti interrotto"/>
   <translation tag="Load and unload filament at the tool by hand" it="Carica e scarica il filamento a mano sullo strumento"/>
   <translation tag="Load canceled: nozzle target dropped" it="Caricamento annullato: il target dell&apos;ugello è sceso"/>

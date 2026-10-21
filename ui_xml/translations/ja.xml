@@ -1856,6 +1856,7 @@
   <translation tag="Load Profile" ja="プロファイルを読み込む"/>
   <translation tag="Load a filament first before trying to unload" ja="排出する前にまずフィラメントを装填してください"/>
   <translation tag="Load a new spool in this slot, or turn on Auto-Refill to switch to a matching one" ja="このスロットに新しいスプールをセットするか、自動補充を有効にして一致するスプールに切り替えてください"/>
+  <translation tag="Load a tool before feeding or retracting"/>
   <translation tag="Load all stopped" ja="すべてのロードを停止しました"/>
   <translation tag="Load and unload filament at the tool by hand" ja="フィラメントはツールで手動でロード・アンロードしてください"/>
   <translation tag="Load canceled: nozzle target dropped" ja="装填をキャンセル: ノズルの目標温度が下がりました"/>

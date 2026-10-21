@@ -165,9 +165,9 @@ manager's `current_index` is the only seat signal.
 
 | Field | Meaning |
 |-------|---------|
-| `current_index` | **The loaded-tool signal.** Global tool index across every unit (`tool = instance*4 + local_slot` for 4-slot units); `-1` = nothing loaded. This is the fourth and last explicit seat signal `src/printer/ams_backend_ace.cpp#parse_ace_object` arbitrates, via `seat_from_global_index_locked` |
-| `target_index` | Tool being changed *toward* mid-swap (`-1` when idle). While it names an unseated tool it is `pending_target_slot` and an idle hub reads as a driver-raised action: LOADING from an empty head; swapping out a seated tool, UNLOADING (path on the outgoing lane) until `rdm_sensor` clears, then LOADING on the target lane. The sensor is made again by the incoming strand, so a per-swap latch, not the sensor alone, holds the phase (`src/printer/ams_backend_ace.cpp#apply_target_index_locked`) |
-| `ace_instances` | Unit count (1 on the captured rig) |
+| `current_index` | **The loaded-tool signal.** The driver's tool number across every unit (`tool = tool_base + instance*4 + local_slot` for 4-slot units, `tool_base` 0 by default); `-1` = nothing loaded. This is the fourth and last explicit seat signal `src/printer/ams_backend_ace.cpp#parse_ace_object` arbitrates, via `seat_from_tool_locked`, which finds the slot by the `tool` each slot publishes |
+| `target_index` | Tool being changed *toward* mid-swap (`-1` when idle). While it names an unseated tool it is `pending_target_slot` and an idle hub reads as a driver-raised action: LOADING from an empty head; swapping out a seated tool, UNLOADING (path on the outgoing lane) until `rdm_sensor` clears, then LOADING on the target lane. The sensor is made again by the incoming strand, so a per-swap latch, not the sensor alone, holds the phase (`src/printer/ams_backend_ace.cpp#apply_target_index_locked`). |
+| `ace_instances` | Unit count |
 | `endless_spool_enabled`, `endless_spool_match_mode` | Endless-spool config (`false` / `"exact"` captured) |
 | `ace_pro_enabled` | Master switch; presence is the capability |
 | `toolhead_sensor`, `rdm_sensor` | Path sensors (toolhead, hub). With nothing seated, or during a driver-started swap, they place the strand: toolhead made = `TOOLHEAD`, hub only = `OUTPUT` (`#get_filament_segment`). A seated tool outside a swap answers `NOZZLE` once `target_index` is `-1` or the toolhead sensor is made; while the driver still targets it short of the toolhead (a retried feed keeps `target_index` on the current tool) the sensors place the strand. The driver persists `target_index` and can leave it latched on a loaded tool, which is why the toolhead sensor alone ends the retry. A seated tool with both sensors clear is a feed the driver paused on: `current_tool`/`current_slot` keep naming it, but it is published as not loaded and its slot is not stamped LOADED (`#path_empty_under_seat_locked`) |
@@ -184,21 +184,26 @@ manager's `current_index` is the only seat signal.
 | `model`, `firmware`, `boot_firmware`, `protocol` (`"ace1_json"`), `usb_port`, `usb_path`, `connection_state` | Identity/telemetry (`"Anycubic Color Engine Pro"` / `"V1.3.856"` captured) |
 
 **How the backend reads it** (`src/printer/ams_backend_ace.cpp#on_started`,
-`#handle_status`): the slot-bearing `ace_instance_N` object is parsed first
-(`select_ace_object`), then a manager-shaped `ace` riding the same query response
-or notify frame is parsed after it — slots land first, the seat stamps onto them. Any
+`#handle_status`): the bootstrap queries every `ace_instance_N` discovery found
+(`ace_instance_0`-`3` when discovery lists none) and commits to the object path when one
+carries slots (`select_ace_object`). Every `ace_instance_N` is then unit N, parsed in
+ascending N, and a manager-shaped `ace` riding the same query response or notify frame
+is parsed after them — slots land first, the seat stamps onto them. Any
 non-empty `ace` without slots counts as the manager, since its deltas name `current_index`
 only when the seat moved (`#manager_ace_object`). A
 manager-only notify frame (e.g. `current_index` flipping to `-1` on a TR) is parsed on its
-own and clears the seat. Notify frames carry per-object deltas: a frame carrying any
-`ace_instance_N` key resolves to the lowest such instance (the one the display is
-anchored to), and a frame with no slots array at all falls back to the first non-empty
-object rather than being dropped.
+own and clears the seat. Notify frames carry per-object deltas, so a frame holds only
+the units that changed, each applied to its own unit; on the other drivers a frame with
+no slots array at all falls back to the first non-empty object rather than being dropped.
 
-**Multi-unit rigs** (`ace_instances > 1`, unobserved — every capture so far has one unit):
-the backend displays the lowest instance only. A `current_index` beyond that unit's slots
-seats the tool and marks no slot, and the active-material display falls back to the
-external-spool profile while printing from an undisplayed unit's lane.
+**Multi-unit rigs** (`ace_instances > 1`; observed with an ACE Pro and an ACE 2):
+each instance is a unit of its own, its slots numbered globally after the units before
+it (`#index_units_locked`), so the UI's multi-unit overview shows every unit. Every fork
+lane names the `extruder` and the hub `ace`: all units feed one toolhead through the one
+hub `rdm_sensor` watches. Each unit keeps its own dryer and environment, and the dryer
+commands name it (`ACE_START_DRYING INSTANCE=N`; without INSTANCE= the fork dries every
+unit). Each unit's `status` word is kept apart, so one unit reading `ready` does not end
+another's `loading` (`#set_unit_action_locked`).
 
 **REST surface** (`ace_status.py`; used when no slot-bearing object answers the initial
 query):
