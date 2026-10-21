@@ -201,7 +201,11 @@ class AmsOverviewPanel : public PanelBase {
 
     // === Observers ===
     ObserverGuard slots_version_observer_;
-    ObserverGuard current_slot_observer_;   ///< Reactive highlight update when active slot changes
+    ObserverGuard current_slot_observer_; ///< Reactive highlight update when active slot changes
+    /// A load in progress: the strand moving, the target named, unload turning to load.
+    ObserverGuard path_segment_observer_;
+    ObserverGuard pending_target_observer_;
+    ObserverGuard action_observer_;
     ObserverGuard external_spool_observer_; ///< Reactive updates when external spool color changes
     ObserverGuard bypass_active_observer_;  ///< Active ring follows bypass engage/disengage
     ObserverGuard dryer_version_observer_;  ///< The stubs' drying glyph follows other units' dryers

@@ -29,6 +29,7 @@
 #include "ams_state.h"
 #include "display_settings_manager.h"
 #include "src/ui/ui_filament_path_internal.h"
+#include "src/ui/ui_system_path_plan.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
 
@@ -48,6 +49,7 @@ namespace {
 
 constexpr int kSlotsPerUnit = 4;
 constexpr int kOwnNumberBase = 100;
+constexpr uint32_t kSlotColorBase = 0x100000; ///< slot g is colored kSlotColorBase + g
 
 struct UnitSpec {
     std::string name;
@@ -106,6 +108,7 @@ class PagedFleet : public AmsBackendMock {
                 slot.slot_index = s;
                 slot.global_index = unit.first_slot_global_index + s;
                 slot.extruder_name = specs[pos].extruder;
+                slot.color_rgb = kSlotColorBase + static_cast<uint32_t>(slot.global_index);
                 unit.slots.push_back(slot);
             }
             info.units.push_back(unit);
@@ -113,6 +116,8 @@ class PagedFleet : public AmsBackendMock {
         info.total_slots = first_slot;
         info.current_slot = loaded_slot;
         info.filament_loaded = loaded_slot >= 0;
+        info.pending_target_slot = pending_slot;
+        info.action = action;
         return info;
     }
 
@@ -132,6 +137,8 @@ class PagedFleet : public AmsBackendMock {
     mutable int info_reads = 0;              ///< get_system_info() calls, a full copy each
     int loaded_slot = 2 * kSlotsPerUnit + 1; ///< a bay of unit 2
     int drying_unit = kOwnNumberBase + 6;    ///< by the unit's own number
+    int pending_slot = -1;                   ///< a toolchange's target, -1 for none
+    AmsAction action = AmsAction::IDLE;
 };
 
 class PagingFixture : public LVGLUITestFixture {
@@ -1101,6 +1108,76 @@ TEST_CASE_METHOD(LVGLTestFixture,
     CHECK(lv_obj_has_flag(w.box, LV_OBJ_FLAG_HIDDEN));
 
     helix::ui::bypass_spool_destroy(w);
+}
+
+// A load moves the strand along the path and names its target before any
+// slot or the seat changes: a hub whose lanes report no motion of their own
+// (ACE) changes nothing else until the new tool is in.
+TEST_CASE_METHOD(PagingFixture, "Unit view: a load in progress redraws the page",
+                 "[ams][pages][panel]") {
+    open_at(2);
+    auto& ams = AmsState::instance();
+    settle();
+    const int base = AmsPanelTestAccess::pages_refreshes(panel());
+
+    SECTION("the strand moving along the path") {
+        lv_subject_t* segment = ams.get_path_filament_segment_subject();
+        lv_subject_set_int(segment, lv_subject_get_int(segment) == 5 ? 6 : 5);
+        settle();
+        CHECK(AmsPanelTestAccess::pages_refreshes(panel()) == base + 1);
+    }
+
+    SECTION("the toolchange naming its target") {
+        lv_subject_t* target = ams.get_pending_target_slot_subject();
+        lv_subject_set_int(target, lv_subject_get_int(target) == 1 ? 2 : 1);
+        settle();
+        CHECK(AmsPanelTestAccess::pages_refreshes(panel()) == base + 1);
+    }
+
+    SECTION("the action turning from unloading to loading") {
+        lv_subject_t* action = ams.get_ams_action_subject();
+        lv_subject_set_int(action, lv_subject_get_int(action) == 1 ? 2 : 1);
+        settle();
+        CHECK(AmsPanelTestAccess::pages_refreshes(panel()) == base + 1);
+    }
+}
+
+TEST_CASE_METHOD(PagingFixture, "Overview: the path follows the slot a toolchange is moving",
+                 "[ams][pages][panel]") {
+    constexpr int kLoaded = 2 * kSlotsPerUnit + 1; // a bay of unit 2
+    constexpr int kTarget = 6 * kSlotsPerUnit + 1; // a bay of unit 6
+
+    auto path_after = [this](int pending, AmsAction action) {
+        install([&](PagedFleet& f) {
+            f.loaded_slot = kLoaded;
+            f.pending_slot = pending;
+            f.action = action;
+        });
+        open();
+        settle();
+        const auto* data =
+            helix::ui::syspath::system_path_data(AmsPanelTestAccess::system_path(panel()));
+        REQUIRE(data != nullptr);
+        return *data;
+    };
+
+    SECTION("idle: the loaded slot's unit, by its position") {
+        const auto data = path_after(-1, AmsAction::IDLE);
+        CHECK(data.active_unit == 2);
+        CHECK(data.active_color == kSlotColorBase + kLoaded);
+    }
+
+    SECTION("unloading: the slot leaving the nozzle") {
+        const auto data = path_after(kTarget, AmsAction::UNLOADING);
+        CHECK(data.active_unit == 2);
+        CHECK(data.active_color == kSlotColorBase + kLoaded);
+    }
+
+    SECTION("loading: the target, in another unit") {
+        const auto data = path_after(kTarget, AmsAction::LOADING);
+        CHECK(data.active_unit == 6);
+        CHECK(data.active_color == kSlotColorBase + kTarget);
+    }
 }
 
 TEST_CASE_METHOD(PagingFixture, "Unit view: subjects that fire in one tick sync the pages once",
